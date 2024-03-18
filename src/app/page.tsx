@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useExtraCells } from "@glideapps/glide-data-grid-cells";
+import dynamic from "next/dynamic";
 
 import {
-  DataEditor,
   GridCell,
   GridCellKind,
   GridColumn,
@@ -13,6 +13,13 @@ import {
   Item,
   GridColumnIcon,
 } from "@glideapps/glide-data-grid";
+
+const Grid = dynamic(
+  () => {
+    return import("../app/components/grid");
+  },
+  { ssr: false }
+);
 
 interface TableData {
   id: number;
@@ -41,14 +48,34 @@ export default function App() {
     fetchData();
   }, []);
 
-  const appendRow = () => {
+  const appendRow = async () => {
     const newRow: TableData = {
       id: commentData.length + 1,
       name: "New Task",
       completed: false,
       color: ["red", "green", "yellow", "blue"],
     };
-    setCommentData([...commentData, newRow]);
+
+    try {
+      const response = await fetch(
+        "https://65f70b7db4f842e808850415.mockapi.io/api/v1/todos",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(newRow),
+        }
+      );
+
+      if (response.ok) {
+        fetchData();
+      } else {
+        throw new Error("Failed to create the item");
+      }
+    } catch (error) {
+      console.error("Error creating data: ", error);
+    }
   };
 
   const columns: GridColumn[] = [
@@ -96,7 +123,7 @@ export default function App() {
           copyData: "4",
           data: {
             kind: "dropdown-cell",
-            allowedValues: d.split(","),
+            allowedValues: ["red", "green", "yellow", "blue"],
             value: d.split(",")[row] || "red",
           },
         };
@@ -113,14 +140,45 @@ export default function App() {
     [commentData]
   );
 
+  async function updateData(data) {
+    const { id, ...changes } = data;
+
+    console.log(changes, "changes");
+
+    try {
+      const response = await fetch(
+        `https://65f70b7db4f842e808850415.mockapi.io/api/v1/todos/${id + 1}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(changes),
+        }
+      );
+
+      if (response.ok) {
+        fetchData();
+      } else {
+        throw new Error("Failed to update the item");
+      }
+    } catch (error) {
+      console.error("Error updating data: ", error);
+    }
+  }
+
   const onCellEdited = React.useCallback(
     (cell: Item, newValue: EditableGridCell) => {
-      if (newValue.kind === GridCellKind.Text) {
-        console.log("changedTextValue", newValue.data);
-      } else if (newValue.kind === GridCellKind.Boolean) {
-        console.log(newValue, "changedBooleanValue");
+      const [col, row] = cell;
+
+      if (newValue.kind === GridCellKind.Text && col == 1) {
+        updateData({ id: row, name: newValue.data });
+      } else if (newValue.kind === "boolean" && col == 2) {
+        updateData({ id: row, completed: !newValue.data });
+      } else if (newValue.kind === "custom" && col == 3) {
+        updateData({ id: row, color: newValue.data.value });
       } else {
-        return;
+        console.log("Need to implement");
       }
     },
     []
@@ -128,7 +186,7 @@ export default function App() {
 
   return (
     <>
-      <DataEditor
+      <Grid
         {...cellProps}
         columns={columns}
         getCellContent={getData}
