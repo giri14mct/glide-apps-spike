@@ -11,6 +11,7 @@ import {
   GridColumn,
   EditableGridCell,
   Item,
+  CustomCell,
   GridColumnIcon,
 } from "@glideapps/glide-data-grid";
 
@@ -20,6 +21,12 @@ const Grid = dynamic(
   },
   { ssr: false }
 );
+
+interface DropdownCellData {
+  kind: "dropdown-cell";
+  allowedValues: string[];
+  value: string;
+}
 
 interface TableData {
   id: number;
@@ -140,7 +147,12 @@ export default function App() {
     [commentData]
   );
 
-  async function updateData(data) {
+  async function updateData(data: {
+    id: any;
+    name?: string;
+    completed?: boolean;
+    color?: any;
+  }) {
     const { id, ...changes } = data;
 
     console.log(changes, "changes");
@@ -167,6 +179,8 @@ export default function App() {
     }
   }
 
+  interface DropdownCell extends CustomCell<DropdownCellData> {}
+
   const onCellEdited = React.useCallback(
     (cell: Item, newValue: EditableGridCell) => {
       const [col, row] = cell;
@@ -174,9 +188,11 @@ export default function App() {
       if (newValue.kind === GridCellKind.Text && col == 1) {
         updateData({ id: row, name: newValue.data });
       } else if (newValue.kind === "boolean" && col == 2) {
-        updateData({ id: row, completed: !newValue.data });
+        updateData({ id: row, completed: !newValue.data as boolean });
       } else if (newValue.kind === "custom" && col == 3) {
-        updateData({ id: row, color: newValue.data.value });
+        const customValue = newValue as DropdownCell;
+        updateData({ id: row, color: customValue.data.value });
+        // updateData({ id: row, color: newValue.data.value });
       } else {
         console.log("Need to implement");
       }
